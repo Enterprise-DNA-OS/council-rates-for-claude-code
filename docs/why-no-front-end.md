@@ -15,10 +15,12 @@ That layer used to be the whole product, because talking to a database was hard.
 
 - **A visual board.** Stages are a table you ask about, not cards you drag.
 - **A phone app.** It runs where Claude Code runs.
+- **A ratepayer portal.** Ratepayers cannot log in and see their account. A portal is a front end on the same database, and a customisation.
+- **Receipting at a counter.** Payments are recorded from the bank file, not taken over a counter.
 - **A vendor help desk.** This is open source. Enterprise DNA supports the installed version for businesses that want someone to call.
 
 ## Who this fits
 
-Small teams who already use Claude Code, or who would rather learn to ask than learn another interface. If your team needs a screen to look at all day, keep TechnologyOne. If you need the answers more than the screens, this is cheaper, faster and yours.
+A rates team of two to ten people who would rather ask than click through another module. Customer services staff who answer rates enquiries all day at a counter want a screen: that is a front end Enterprise DNA builds on the same database, or a reason to keep TechnologyOne. If you need the answers more than the screens, this is cheaper, faster and yours.
 
 Installed and run for you: https://enterprisedna.co/omni/instead-of/technologyone

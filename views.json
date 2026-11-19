@@ -1,13 +1,40 @@
 [
   {
     "name": "week",
-    "title": "This week",
-    "subtitle": "Council Rates for Claude Code: what needs attention, rendered by npm run view",
+    "title": "This week in rates",
+    "subtitle": "Council Rates for Claude Code: arrears, penalties, relief and the roll, rendered by npm run view",
     "sections": [
       {
-        "title": "Needs attention",
-        "note": "TODO(author): point this at the industry's attention view (overdue, stuck, quiet).",
-        "sql": "select 'replace me' as item, 'TODO(author)' as why"
+        "title": "Arrears, oldest first",
+        "note": "The next step comes from the council's ladder in settings and the s 62 mortgagee timing.",
+        "sql": "select assessment_no, address, coalesce(ratepayer_names, '(no ratepayer)') as ratepayer, overdue_cents::bigint as overdue_cents, days_overdue, next_step from v_arrears order by days_overdue desc, overdue_cents desc"
+      },
+      {
+        "title": "Instalments",
+        "sql": "select y.label as year, i.no, i.due_on, i.penalty_on, i.issued_on as invoiced_on, i.penalties_applied_on, (select coalesce(sum(u.unpaid_cents), 0)::bigint from unpaid_on_instalment(i.id, current_date) u) as unpaid_cents from instalments i join rating_years y on y.id = i.rating_year_id where y.starts_on <= current_date and y.ends_on >= current_date order by i.no"
+      },
+      {
+        "title": "Relief, rebates and objections waiting",
+        "sql": "select 'Remission or postponement' as what, u.assessment_no, a.policy_code as detail, a.received_on from relief_applications a join rating_units u on u.id = a.rating_unit_id where a.status = 'received' union all select 'Rebate to decide', u.assessment_no, r.applicant, r.received_on from rebate_applications r join rating_units u on u.id = r.rating_unit_id where r.status = 'received' union all select 'Rebate to claim from DIA', u.assessment_no, r.applicant, r.decided_on from rebate_applications r join rating_units u on u.id = r.rating_unit_id where r.status = 'approved' union all select 'Objection (s 29)', u.assessment_no, o.objector, o.received_on from objections o join rating_units u on u.id = o.rating_unit_id where o.status = 'open' order by 4"
+      },
+      {
+        "title": "Gaps in the rating information database",
+        "sql": "select u.assessment_no, u.address, case when n.ratepayer_count = 0 then 'No ratepayer on file' when u.valuation_date < current_date - interval '3 years' then 'Value over 3 years old' else 'No rates assessment this year' end as gap from rating_units u join v_ratepayer_names n on n.rating_unit_id = u.id where u.status = 'active' and (n.ratepayer_count = 0 or u.valuation_date < current_date - interval '3 years' or not exists (select 1 from assessments a join rating_years y on y.id = a.rating_year_id where a.rating_unit_id = u.id and y.starts_on <= current_date and y.ends_on >= current_date)) order by u.assessment_no"
+      }
+    ]
+  },
+  {
+    "name": "revenue",
+    "title": "Rates revenue",
+    "subtitle": "What this year's strike raises, by rate and by category",
+    "sections": [
+      {
+        "title": "By rate",
+        "sql": "select rt.code, rt.name, rt.kind, rt.basis, count(*)::int as units, sum(l.amount_cents)::bigint as revenue_cents from assessment_lines l join assessments a on a.id = l.assessment_id join rate_types rt on rt.id = l.rate_type_id join rating_years y on y.id = a.rating_year_id where y.starts_on <= current_date and y.ends_on >= current_date group by rt.id order by 6 desc"
+      },
+      {
+        "title": "By category",
+        "sql": "select a.category_code as category, count(*)::int as units, sum(a.capital_value_cents)::bigint as capital_value_cents, sum(a.total_cents)::bigint as rates_cents, (sum(a.total_cents) / nullif(count(*), 0))::bigint as average_cents from assessments a join rating_years y on y.id = a.rating_year_id where y.starts_on <= current_date and y.ends_on >= current_date group by 1 order by 4 desc"
       }
     ]
   }

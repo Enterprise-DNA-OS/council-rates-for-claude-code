@@ -1,11 +1,36 @@
 [
   {
-    "name": "example",
-    "title": "TODO(author): the first document this industry must produce",
-    "for_each": "select gen_random_uuid() as id, 'Example' as name",
+    "name": "rates-assessment",
+    "title": "Rates assessment",
+    "for_each": "select a.id, u.assessment_no || '-' || y.label as name from assessments a join rating_units u on u.id = a.rating_unit_id join rating_years y on y.id = a.rating_year_id order by u.assessment_no",
     "file": "name",
     "sections": [
-      { "title": "Details", "sql": "select 'replace me' as item, $1::text as record_id" }
+      { "title": "Rating unit", "layout": "record", "sql": "select s.council_name as council, y.label as rating_year, u.assessment_no, u.valuation_ref, coalesce(a.ratepayer_names, '(no ratepayer)') as ratepayer, u.address, u.legal_description, u.area_ha, a.category_code as differential_category, a.land_value_cents, a.capital_value_cents, u.valuation_date, a.issued_on from assessments a join rating_units u on u.id = a.rating_unit_id join rating_years y on y.id = a.rating_year_id cross join settings s where a.id = $1" },
+      { "title": "Rates for the year", "sql": "select rt.name as rate, rt.basis, l.basis_amount, l.factor, l.amount_cents from assessment_lines l join rate_types rt on rt.id = l.rate_type_id where l.assessment_id = $1 order by l.amount_cents desc" },
+      { "title": "Total and instalments", "sql": "select 'Total rates (GST inclusive)' as item, a.total_cents as amount_cents, null::date as due_on from assessments a where a.id = $1 union all select 'Instalment ' || i.no, null, i.due_on from instalments i join assessments a on a.rating_year_id = i.rating_year_id where a.id = $1" },
+      { "title": "Your rights", "sql": "select 'You can object to the information in the rating information database (Local Government (Rating) Act 2002 s 29), and ask in writing for your name and postal address to be withheld from it (s 28C).' as note where $1::uuid is not null" }
+    ]
+  },
+  {
+    "name": "rates-invoice",
+    "title": "Rates invoice",
+    "for_each": "select v.id, u.assessment_no || '-instalment-' || i.no as name from invoices v join rating_units u on u.id = v.rating_unit_id join instalments i on i.id = v.instalment_id order by i.no, u.assessment_no",
+    "file": "name",
+    "sections": [
+      { "title": "Invoice", "layout": "record", "sql": "select s.council_name as council, y.label as rating_year, i.no as instalment, v.issued_on as invoice_date, i.due_on, coalesce(n.ratepayer_names, '(no ratepayer)') as ratepayer, u.assessment_no, u.address, u.legal_description, a.total_cents as rates_for_the_year_cents, v.amount_cents as this_instalment_cents, i.penalty_on as penalty_date, i.penalty_pct as penalty_percent from invoices v join instalments i on i.id = v.instalment_id join rating_years y on y.id = i.rating_year_id join rating_units u on u.id = v.rating_unit_id join assessments a on a.rating_unit_id = u.id and a.rating_year_id = y.id left join v_ratepayer_names n on n.rating_unit_id = u.id cross join settings s where v.id = $1" },
+      { "title": "Account as at the invoice date", "sql": "select l.entry_on, l.kind, l.ref, l.amount_cents from ledger l join invoices v on v.rating_unit_id = l.rating_unit_id where v.id = $1 and l.entry_on <= v.issued_on order by l.entry_on, l.created_at" },
+      { "title": "To pay now", "layout": "record", "sql": "select (select coalesce(sum(l.amount_cents), 0) from ledger l where l.rating_unit_id = v.rating_unit_id and l.entry_on <= v.issued_on)::bigint as balance_due_cents from invoices v where v.id = $1" }
+    ]
+  },
+  {
+    "name": "arrears-statement",
+    "title": "Statement of rates arrears",
+    "for_each": "select rating_unit_id as id, assessment_no as name from v_arrears where days_overdue >= 14 order by assessment_no",
+    "file": "name",
+    "sections": [
+      { "title": "Property", "layout": "record", "sql": "select s.council_name as council, b.assessment_no, b.address, coalesce(b.ratepayer_names, '(no ratepayer)') as ratepayer, b.overdue_cents, b.days_overdue, b.oldest_unpaid_due, b.next_step from v_arrears b cross join settings s where b.rating_unit_id = $1" },
+      { "title": "Account", "sql": "select entry_on, kind, coalesce(penalty_type, '') as penalty, ref, amount_cents from ledger where rating_unit_id = $1 order by entry_on, created_at" },
+      { "title": "Recovery steps taken", "sql": "select taken_on, step, actor, note from arrears_actions where rating_unit_id = $1 order by taken_on" }
     ]
   }
 ]
